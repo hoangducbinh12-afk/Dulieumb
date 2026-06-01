@@ -2,10 +2,10 @@ import streamlit as st
 import json
 import os
 
-# 1. Cấu hình giao diện chuẩn Mobile
-st.set_page_config(page_title="Loto Intelligence Fix", page_icon="🎯", layout="centered")
+# 1. Cấu hình giao diện
+st.set_page_config(page_title="Loto Pro V3.4", page_icon="🎯", layout="centered")
 
-# 2. CSS làm đẹp giao diện
+# 2. CSS giao diện
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
@@ -20,7 +20,6 @@ st.markdown("""
 
 DATA_FILE = "data_master.json"
 
-# 3. Hàm xử lý dữ liệu (Load/Save)
 def load_all_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -29,8 +28,7 @@ def load_all_data():
                 master = full_data.get("master_data", full_data)
                 history = full_data.get("history", [])
                 return master, history
-            except:
-                return {}, []
+            except: return {}, []
     return {}, []
 
 def save_all_data(master, history):
@@ -38,17 +36,21 @@ def save_all_data(master, history):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(full_data, f, ensure_ascii=False)
 
-# 4. Khởi tạo Session State
+# --- KHỞI TẠO DỮ LIỆU ---
 if 'master_data' not in st.session_state:
     m, h = load_all_data()
     st.session_state.master_data = m
     st.session_state.history = h
 
+# Khởi tạo giá trị mặc định cho 2 ô nhập nếu chưa có
+if 'next_t2' not in st.session_state:
+    st.session_state.next_t2 = ""
+if 'next_t1' not in st.session_state:
+    st.session_state.next_t1 = ""
 if 'prediction_result' not in st.session_state:
     st.session_state.prediction_result = None
 
-# Giao diện chính
-st.title("🎯 LOTO SMART V3.3")
+st.title("🎯 LOTO SMART V3.4")
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -60,58 +62,48 @@ with st.sidebar:
             st.session_state.master_data = temp_data.get("master_data", temp_data)
             st.session_state.history = temp_data.get("history", [])
             save_all_data(st.session_state.master_data, st.session_state.history)
-            st.success("Đã đồng bộ!")
-        except:
-            st.error("Lỗi file!")
+            st.success("Đã nạp dữ liệu thành công!")
+        except: st.error("File không hợp lệ!")
 
-    if st.button("❌ RESET ALL"):
-        st.session_state.master_data = {}
-        st.session_state.history = []
+    if st.button("❌ RESET TOÀN BỘ"):
+        st.session_state.clear()
         if os.path.exists(DATA_FILE): os.remove(DATA_FILE)
         st.rerun()
 
     st.subheader("Sao lưu")
     out_json = json.dumps({"master_data": st.session_state.master_data, "history": st.session_state.history}, ensure_ascii=False)
-    st.download_button("📥 TẢI FILE DATA (.json)", out_json, "loto_backup.json", "application/json")
+    st.download_button("📥 TẢI DỮ LIỆU VỀ", out_json, "loto_master.json", "application/json")
 
-# --- PHẦN 1: FORM NHẬP LIỆU SOI CẦU ---
-with st.container():
-    st.write("**PHÂN TÍCH RANK**")
-    # Tự lấy giá trị từ session_state để điền vào ô nhập (Tự nhảy số)
-    val_t2_default = st.session_state.get('next_t2', '')
-    val_t1_default = st.session_state.get('next_t1', '')
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        t2_in = st.text_input("Kỳ T-2", value=val_t2_default, placeholder="Hệ số 10", key="t2_input")
-    with col2:
-        t1_in = st.text_input("Kỳ T-1", value=val_t1_default, placeholder="Hệ số 11", key="t1_input")
+# --- PHẦN 1: NHẬP LIỆU SOI CẦU ---
+st.write("**PHÂN TÍCH RANK**")
+col1, col2 = st.columns(2)
+with col1:
+    t2_in = st.text_input("Kỳ T-2", value=st.session_state.next_t2, placeholder="Hệ số 10", key="t2_input")
+with col2:
+    t1_in = st.text_input("Kỳ T-1", value=st.session_state.next_t1, placeholder="Hệ số 11", key="t1_input")
 
-    if st.button("🚀 SOI DÀN DỰ ĐOÁN", type="primary"):
-        if t1_in and t2_in:
-            p_t1, p_t2 = t1_in.zfill(2), t2_in.zfill(2)
-            scores = {str(i).zfill(2): {"s": 0, "h": 0} for i in range(100)}
-            
-            m = st.session_state.master_data
-            if p_t1 in m:
-                for n, c in m[p_t1].items():
-                    scores[n]["s"] += c * 11
-                    scores[n]["h"] += c
-            if p_t2 in m:
-                for n, c in m[p_t2].items():
-                    scores[n]["s"] += c * 10
-                    scores[n]["h"] += c
-            
-            ranked_list = sorted(scores.keys(), key=lambda x: (-scores[x]["s"], -scores[x]["h"], int(x)))
-            # Lưu vào session để không bị mất khi thao tác tiếp theo
-            st.session_state.prediction_result = {"t1": p_t1, "t2": p_t2, "list": ranked_list}
-        else:
-            st.warning("Nhập đủ 2 kỳ!")
+if st.button("🚀 SOI DÀN DỰ ĐOÁN", type="primary"):
+    if t1_in and t2_in:
+        p_t1, p_t2 = t1_in.zfill(2), t2_in.zfill(2)
+        scores = {str(i).zfill(2): {"s": 0, "h": 0} for i in range(100)}
+        m = st.session_state.master_data
+        if p_t1 in m:
+            for n, c in m[p_t1].items():
+                scores[n]["s"] += c * 11
+                scores[n]["h"] += c
+        if p_t2 in m:
+            for n, c in m[p_t2].items():
+                scores[n]["s"] += c * 10
+                scores[n]["h"] += c
+        
+        ranked_list = sorted(scores.keys(), key=lambda x: (-scores[x]["s"], -scores[x]["h"], int(x)))
+        st.session_state.prediction_result = {"t1": p_t1, "t2": p_t2, "list": ranked_list}
+    else:
+        st.warning("Nhập đủ 2 kỳ đi mày!")
 
 # --- PHẦN 2: HIỂN THỊ KẾT QUẢ ---
-# Sử dụng kiểm tra 'list' in để tránh KeyError
-if st.session_state.prediction_result and "list" in st.session_state.prediction_result:
-    r = st.session_state.prediction_result["list"]
+if st.session_state.prediction_result:
+    r = st.session_state.prediction_result.get("list", [])
     
     res_groups = [
         ("🔥 DÀN CỐI", r[0:9], "#ef4444"),
@@ -134,14 +126,14 @@ if st.session_state.prediction_result and "list" in st.session_state.prediction_
     # --- PHẦN 3: HỌC SỐ & TỰ NHẢY SỐ ---
     st.write("---")
     st.write("**CẬP NHẬT KẾT QUẢ THỰC TẾ**")
-    actual = st.text_input("Con số vừa nổ Kỳ T là gì?", placeholder="VD: 45", key="actual_in")
+    actual = st.text_input("Số về Kỳ T hôm nay là gì?", key="actual_input")
     
     if st.button("💾 GHI NHẬN & HỌC SỐ"):
         if actual:
             act_num = actual.zfill(2)
             pred = st.session_state.prediction_result
             
-            # Tính toán xem rơi vào dàn nào
+            # Kiểm tra ăn dàn
             idx = pred["list"].index(act_num)
             if idx <= 8: g = "DÀN CỐI"
             elif idx <= 18: g = "DÀN KẾT"
@@ -150,34 +142,41 @@ if st.session_state.prediction_result and "list" in st.session_state.prediction_
             elif idx <= 78: g = "XÉT LÓT"
             else: g = "DÀN LOẠI"
             
-            # Cập nhật Master (Chỉ cộng T-1)
+            # Cập nhật Bạc nhớ T-1
             t1_key = pred["t1"]
-            if t1_key not in st.session_state.master_data:
-                st.session_state.master_data[t1_key] = {}
+            if t1_key not in st.session_state.master_data: st.session_state.master_data[t1_key] = {}
             st.session_state.master_data[t1_key][act_num] = st.session_state.master_data[t1_key].get(act_num, 0) + 1
             
-            # Cập nhật Lịch sử
+            # Lưu lịch sử
             st.session_state.history.insert(0, {"num": act_num, "group": g})
             
-            # ĐẢO SỐ TỰ ĐỘNG: Gán giá trị vào session_state để lần sau load lên ô input
-            st.session_state.next_t2 = t1_key # T-1 cũ thành T-2 mới
-            st.session_state.next_t1 = act_num # Số vừa nổ thành T-1 mới
-            
+            # LƯU VÀO MÁY
             save_all_data(st.session_state.master_data, st.session_state.history)
-            st.session_state.prediction_result = None # Xóa dàn cũ
-            st.success(f"Đã học số {act_num}. Kỳ mới đã sẵn sàng!")
+
+            # --- THUẬT TOÁN TỰ NHẢY SỐ (FIX TRIỆT ĐỂ) ---
+            # Bước 1: Gán giá trị mới vào biến tạm
+            new_t2 = t1_key
+            new_t1 = act_num
+            
+            # Bước 2: Cập nhật Widget State của Streamlit (Đây là chìa khóa)
+            st.session_state.t2_input = new_t2
+            st.session_state.t1_input = new_t1
+            st.session_state.next_t2 = new_t2
+            st.session_state.next_t1 = new_t1
+            
+            # Bước 3: Xóa ô nhập kết quả thực tế để lần sau trống
+            st.session_state.actual_input = ""
+            
+            # Bước 4: Xóa kết quả soi cũ
+            st.session_state.prediction_result = None
+            
+            st.success(f"Đã học số {act_num}. Đã đảo số cho kỳ sau!")
             st.rerun()
 
 # --- PHẦN 4: NHẬT KÝ ---
 st.write("---")
 st.subheader("📋 Nhật ký nổ")
 if st.session_state.history:
-    for h in st.session_state.history[:20]:
-        badge_style = "color:#ef4444; font-weight:bold;" if h['group'] == "DÀN CỐI" else "color:#1e293b;"
-        st.markdown(f"""
-            <div class="history-item">
-                Số về: <b>{h['num']}</b> ➔ <span style="{badge_style}">{h['group']}</span>
-            </div>
-        """, unsafe_allow_html=True)
-else:
-    st.caption("Chưa có lịch sử.")
+    for h in st.session_state.history[:15]:
+        badge = "color:#ef4444; font-weight:bold;" if h['group'] == "DÀN CỐI" else "color:#1e293b;"
+        st.markdown(f"""<div class="history-item">Số về: <b>{h['num']}</b> ➔ <span style="{badge}">{h['group']}</span></div>""", unsafe_allow_html=True)
