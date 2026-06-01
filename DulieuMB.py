@@ -3,9 +3,9 @@ import json
 import os
 
 # Cấu hình giao diện chuẩn Mobile gọn gàng
-st.set_page_config(page_title="Loto Pro V3.0", page_icon="📊", layout="centered")
+st.set_page_config(page_title="Loto Pro V3.1", page_icon="📊", layout="centered")
 
-# CSS tùy chỉnh để ép giao diện siêu gọn trên điện thoại
+# CSS tùy chỉnh để ép giao diện siêu gọn trên điện thoại (đã sửa lỗi tham số markdown)
 st.markdown("""
     <style>
     .block-container { padding-top: 1rem; padding-bottom: 1rem; max-width: 450px; }
@@ -13,11 +13,11 @@ st.markdown("""
     div[data-testid="stVerticalBlock"] > div { autocomplete: off; }
     .stNumberInput [data-testid="stMarkdownContainer"] p { font-size: 11px; font-weight: bold; }
     </style>
-""", unsafe_allow_name_allowed=True)
+""", unsafe_allow_html=True)
 
 DATA_FILE = "data_master.json"
 
-# Hàm tải dữ liệu gốc
+# Hàm tải dữ liệu gốc từ file json
 def load_master_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -40,9 +40,9 @@ if 'history' not in st.session_state:
 if 'prediction_result' not in st.session_state:
     st.session_state.prediction_result = None
 
-st.title("🎯 LOTO SMART PRO V3.0")
+st.title("🎯 LOTO SMART PRO V3.1")
 
-# --- BƯỚC 1: QUẢN LÝ DỮ LIỆU ---
+# --- BƯỚC 1: QUẢN LÝ DỮ LIỆU Ở SIDEBAR ---
 with st.sidebar:
     st.header("⚙️ Cấu hình hệ thống")
     uploaded_file = st.file_uploader("Nạp đè file JSON mới", type=["json"])
@@ -102,8 +102,7 @@ if st.button("🚀 SOI DÀN KẾT QUẢ KỲ T", use_container_width=True):
                 scores[num]["score"] += count * 10
                 scores[num]["hits"] += count
                 
-        # Sắp xếp Rank theo đúng luật của mày
-        # Điểm cao -> Tổng nổ lớn -> Số nhỏ ưu tiên hơn (giả lập gan)
+        # Sắp xếp Rank theo đúng luật: Điểm cao -> Tổng nổ lớn -> Số nhỏ ưu tiên hơn
         ranked = sorted(
             scores.keys(),
             key=lambda x: (-scores[x]["score"], -scores[x]["hits"], int(x))
@@ -115,7 +114,7 @@ if st.button("🚀 SOI DÀN KẾT QUẢ KỲ T", use_container_width=True):
             "ranked_list": ranked
         }
 
-# --- HIỂN THỊ KẾT QUẢ TEXT SÀN LOẠI ---
+# --- HIỂN THỊ KẾT QUẢ DẠNG TEXT RÕ RÀNG ---
 if st.session_state.prediction_result:
     ranked = st.session_state.prediction_result["ranked_list"]
     
@@ -130,11 +129,11 @@ if st.session_state.prediction_result:
     st.markdown(f"🎯 **DÀN KẾT:** {', '.join(ket)}")
     st.markdown(f"⭐ **DÀN ĐẸP:** {', '.join(dep)}")
     st.markdown(f"💎 **TRUNG BÌNH:** {', '.join(tb)}")
-    st.markdown(f"🛡️ **Xinput LÓT:** {', '.join(lot)}")
+    st.markdown(f"🛡️ **XÉT LÓT:** {', '.join(lot)}")
     st.markdown(f"🚫 **DÀN LOẠI:** {', '.join(loai)}")
     st.write("---")
 
-    # --- BƯỚC 3: GHI NHẬN KẾT QUẢ THỰC TẾ (HỌC SỐ) ---
+    # --- BƯỚC 3: GHI NHẬN KẾT QUẢ THỰC TẾ (HỌC SỐ CHỈ CỘNG T-1) ---
     st.subheader("📝 Ghi nhận Kỳ T thực tế")
     actual_input = st.text_input("Tối nay đài nổ con gì?", max_chars=2, placeholder="VD: 45")
     
@@ -145,7 +144,7 @@ if st.session_state.prediction_result:
             act_num = actual_input.zfill(2)
             pred = st.session_state.prediction_result
             
-            # Đối chiếu ăn dàn nào
+            # Đối chiếu xem con số nổ rơi vào dàn nào
             idx = pred["ranked_list"].index(act_num)
             if idx <= 8: res = "DÀN CỐI"
             elif idx <= 18: res = "DÀN KẾT"
@@ -154,29 +153,28 @@ if st.session_state.prediction_result:
             elif idx <= 78: res = "XÉT LÓT"
             else: res = "DÀN LOẠI"
             
-            # --- CHỈ CẬP NHẬT BẠC NHỚ CHO CON KỲ T-1 ---
+            # Chỉ cập nhật cộng +1 nhịp vào kho bạc nhớ của con Kỳ T-1
             t1 = pred["t1"]
             if t1 not in st.session_state.master_data:
                 st.session_state.master_data[t1] = {}
             
             st.session_state.master_data[t1][act_num] = st.session_state.master_data[t1].get(act_num, 0) + 1
             
-            # Lưu vĩnh viễn vào file cứng và bộ nhớ máy
+            # Lưu đè dữ liệu mới cập nhật vào file json trên máy chủ
             save_master_data(st.session_state.master_data)
             
-            # Lưu nhật ký hiển thị
+            # Thêm thông tin vào danh sách nhật ký hiển thị công khai
             st.session_state.history.insert(0, {"num": act_num, "group": res})
             
             st.success(f"Ghi nhận thành công số {act_num} thuộc {res}! Bộ nhớ T-1 ({t1}) đã được cộng 1 nhịp.")
             
-            # Reset trạng thái dự đoán để chuẩn bị cho ngày tiếp theo, tự động đảo số thông minh
+            # Xóa trạng thái dự đoán cũ và kích hoạt đảo số tự động cho ngày mai
             st.session_state.prediction_result = None
             st.rerun()
 
 # --- BẢNG NHẬT KÝ NỔ DÀN ---
 st.subheader("📋 Nhật ký nổ dàn")
 if st.session_state.history:
-    # Hiển thị bảng lịch sử dạng tối giản đúng yêu cầu
     for idx, item in enumerate(st.session_state.history):
         st.text(f"Kỳ {len(st.session_state.history) - idx}: Số về {item['num']} ➔ {item['group']}")
 else:
