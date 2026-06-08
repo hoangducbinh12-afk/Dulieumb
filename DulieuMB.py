@@ -157,7 +157,7 @@ if st.session_state.prediction_result:
         ("🎯 DÀN KẾT", r[9:19], "#f97316"),
         ("⭐ DÀN ĐẸP", r[19:39], "#eab308"),
         ("💎 TRUNG BÌNH", r[39:59], "#22c55e"),
-        ("🛡️ XXét Lót", r[59:79], "#3b82f6"),
+        ("🛡️ XÉT LÓT", r[59:79], "#3b82f6"),
         ("🚫 DÀN LOẠI", r[79:100], "#94a3b8")
     ]
     st.write("---")
